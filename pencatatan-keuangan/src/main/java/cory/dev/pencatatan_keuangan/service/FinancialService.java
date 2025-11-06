@@ -79,6 +79,14 @@ public class FinancialService {
             .map(r -> currentBalance.subtract(r.getBalance()))
             .orElse(null);
     }
+
+    public void loadRecordsFromSource(List<FinancialRecord> sourceRecords) {
+        this.records.clear();
+        this.records.addAll(sourceRecords);
+        // Pastikan data tetap terurut setelah dimuat
+        this.records.sort(Comparator.comparing(FinancialRecord::getDate));
+        System.out.println("    -> Data di memori telah disinkronkan dengan sumber yang dipilih.");
+    }
     
     public List<FinancialRecord> getAllRecords() {
         return new ArrayList<>(records);

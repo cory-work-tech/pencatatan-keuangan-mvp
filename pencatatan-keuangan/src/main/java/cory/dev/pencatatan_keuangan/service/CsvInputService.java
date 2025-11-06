@@ -2,6 +2,7 @@ package cory.dev.pencatatan_keuangan.service;
 
 import java.io.FileReader;
 import java.io.IOException;
+import java.io.StringReader;
 import java.math.BigDecimal;
 import java.nio.file.Files;
 import java.nio.file.Paths;
@@ -59,6 +60,33 @@ public class CsvInputService {
         
         return records;
     }
+
+    public List<FinancialRecord> parseCsvContent(String csvContent) throws IOException {
+    List<FinancialRecord> records = new ArrayList<>();
+    if (csvContent == null || csvContent.trim().isEmpty()) {
+        return records;
+    }
+
+    try (StringReader stringReader = new StringReader(csvContent);
+         CSVParser csvParser = new CSVParser(stringReader, CSVFormat.DEFAULT
+                 .withFirstRecordAsHeader()
+                 .withIgnoreHeaderCase()
+                 .withTrim())) {
+
+        for (CSVRecord csvRecord : csvParser) {
+            try {
+                LocalDate date = LocalDate.parse(csvRecord.get("Tanggal"), DATE_FORMATTER);
+                BigDecimal balance = parseCurrency(csvRecord.get("Saldo Akhir"));
+                BigDecimal change = parseCurrency(csvRecord.get("Perubahan"));
+                records.add(new FinancialRecord(date, balance, change));
+            } catch (Exception e) {
+                System.err.println("Error parsing CSV record from string: " + e.getMessage());
+            }
+        
+        }
+    }
+    return records;
+}
     
     /**
      * Parse currency format "Rp X.XXX.XXX" menjadi BigDecimal

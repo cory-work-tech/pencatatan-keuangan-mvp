@@ -1,7 +1,10 @@
 package cory.dev.pencatatan_keuangan;
 
 import java.math.BigDecimal;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Scanner;
 
 import org.springframework.boot.CommandLineRunner;
@@ -9,8 +12,10 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.Bean;
 
-import cory.dev.pencatatan_keuangan.service.CsvExportService;
+import cory.dev.pencatatan_keuangan.model.FinancialRecord;
+import cory.dev.pencatatan_keuangan.service.CsvInputService;
 import cory.dev.pencatatan_keuangan.service.FinancialService;
+import cory.dev.pencatatan_keuangan.service.GitHubService;
 
 @SpringBootApplication
 public class PencatatanKeuanganApplication {
@@ -20,7 +25,7 @@ public class PencatatanKeuanganApplication {
 	}
 
 	@Bean
-    public CommandLineRunner run(FinancialService financialService) {
+    public CommandLineRunner run(FinancialService financialService, GitHubService gitHubService, CsvInputService csvInputService) {
         return args -> {
             System.out.println("=== Finance Tracker - Input User ===\n");
             
@@ -43,6 +48,54 @@ public class PencatatanKeuanganApplication {
             
             // Input dari user
             Scanner scanner = new Scanner(System.in);
+
+            // --- TAHAP SINKRONISASI ---
+            try {
+                String remoteContent = gitHubService.downloadFileContent();
+                String localContent = null;
+                if (Files.exists(Paths.get("financial_records.csv"))) {
+                    localContent = Files.readString(Paths.get("financial_records.csv"));
+                }
+
+                // Normalisasi line endings untuk perbandingan yang akurat
+                String normalizedRemote = remoteContent != null ? remoteContent.replaceAll("\\r\\n", "\n") : null;
+                String normalizedLocal = localContent != null ? localContent.replaceAll("\\r\\n", "\n") : null;
+
+                if (normalizedRemote != null && !normalizedRemote.equals(normalizedLocal)) {
+                    System.out.println("\n⚠️  PERINGATAN: Versi file di GitHub berbeda dengan versi lokal!");
+                    System.out.println("Silakan pilih versi data yang ingin Anda gunakan:");
+                    System.out.println("  1. Gunakan Versi Lokal (Perubahan lokal Anda akan di-upload saat keluar)");
+                    System.out.println("  2. Gunakan Versi GitHub (Perubahan lokal Anda akan hilang)");
+
+                    String choice = "";
+                    while (!choice.equals("1") && !choice.equals("2")) {
+                        System.out.print("Pilih (1 atau 2): ");
+                        choice = scanner.nextLine().trim();
+                    }
+
+                    if (choice.equals("2")) {
+                        System.out.println("    -> Memuat data dari GitHub...");
+                        List<FinancialRecord> remoteRecords = csvInputService.parseCsvContent(remoteContent);
+                        financialService.loadRecordsFromSource(remoteRecords);
+                    } else {
+                        System.out.println("    -> Tetap menggunakan data lokal.");
+                    }
+                } else if (normalizedRemote == null && normalizedLocal != null) {
+                     System.out.println("    -> Info: Data hanya ada di lokal. Akan di-upload saat keluar.");
+                } else {
+                    System.out.println("    -> Info: Versi lokal dan GitHub sudah sinkron.");
+                }
+
+            } catch (Exception e) {
+                System.err.println("❌ Gagal melakukan sinkronisasi dengan GitHub: " + e.getMessage());
+            }
+            
+            // --- AKHIR TAHAP SINKRONISASI ---
+
+            // Menampilkan data yang sudah ada (setelah sinkronisasi)
+            // ... (kode untuk menampilkan data yang sudah ada seperti sebelumnya)
+
+            // Lanjut ke menu utama
             
             while (true) {
                 System.out.println("\n--- Menu ---");
